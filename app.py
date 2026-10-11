@@ -38,9 +38,9 @@ if input_mode == "Image Snapshot":
             st.image(results[0].plot(), caption="Detected Objects Overlay", channels="BGR", use_container_width=True)
 
 elif input_mode == "Video Clip":
-    uploaded_video = st.file_uploader("Upload Short Video Clip (MP4/MOV)", type=["mp4", "mov"])
+    uploaded_video = st.file_uploader("Upload Short Video Clip (MP4/MOV)", type=["mp4", "mov", "avi"])
     if uploaded_video:
-        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
         tfile.write(uploaded_video.read())
         
         cap = cv2.VideoCapture(tfile.name)
@@ -51,8 +51,9 @@ elif input_mode == "Video Clip":
         st.info("Processing video frames through YOLO11... Please wait.")
         progress_bar = st.progress(0)
         
-        output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-        out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'avc1'), fps, (width, height))
+        # Use VP80 codec and .webm extension for web-browser compatibility
+        output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
+        out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'VP80'), fps, (width, height))
         
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = 0
@@ -71,4 +72,6 @@ elif input_mode == "Video Clip":
         cap.release()
         out.release()
         st.success("Video processing complete!")
+        
+        # Play webm video natively in Streamlit browser player
         st.video(output_file.name)
