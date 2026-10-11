@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import cv2
 import tempfile
-from datetime import datetime
 from ultralytics import YOLO
 
 st.set_page_config(page_title="Real-Life Object Detection System", page_icon="🔍", layout="wide")
@@ -24,11 +23,18 @@ conf_threshold = st.sidebar.slider("AI Confidence Threshold", 0.1, 1.0, 0.3, 0.0
 def load_model():
     return YOLO("best.pt")
 
-model = load_model()
+try:
+    model = load_model()
+except Exception as e:
+    st.error(f"Error loading model: {e}")
+    st.stop()
 
 if input_mode == "Image Snapshot":
-    uploaded_file = st.file_uploader("Upload Test Image", type=["jpg", "jpeg", "png"])
-    if uploaded_file:
+    st.subheader("📷 Image Detection Mode")
+    # Explicitly matching image formats
+    uploaded_file = st.file_uploader("Upload an Image file", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_file is not None:
         image = Image.open(uploaded_file)
         col1, col2 = st.columns(2)
         with col1:
@@ -38,40 +44,45 @@ if input_mode == "Image Snapshot":
             st.image(results[0].plot(), caption="Detected Objects Overlay", channels="BGR", use_container_width=True)
 
 elif input_mode == "Video Clip":
-    uploaded_video = st.file_uploader("Upload Short Video Clip (MP4/MOV)", type=["mp4", "mov", "avi"])
-    if uploaded_video:
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-        tfile.write(uploaded_video.read())
-        
-        cap = cv2.VideoCapture(tfile.name)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)
-        
-        st.info("Processing video frames through YOLO11... Please wait.")
-        progress_bar = st.progress(0)
-        
-        # Use VP80 codec and .webm extension for web-browser compatibility
-        output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
-        out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'VP80'), fps, (width, height))
-        
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_count = 0
-        
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            results = model.predict(source=frame, conf=conf_threshold, verbose=False)
-            annotated_frame = results[0].plot()
-            out.write(annotated_frame)
-            frame_count += 1
-            if total_frames > 0:
-                progress_bar.progress(min(frame_count / total_frames, 1.0))
-                
-        cap.release()
-        out.release()
-        st.success("Video processing complete!")
-        
-        # Play webm video natively in Streamlit browser player
-        st.video(output_file.name)
+    st.subheader("🎥 Video Detection Mode")
+    # Explicitly matching video formats so it accepts mp4, mov, etc. without erroring
+    uploaded_video = st.file_uploader("Upload a Video file", type=["mp4", "mov", "avi", "mkv"])
+    
+    if uploaded_video is not None:
+        try:
+            tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            tfile.write(uploaded_video.read())
+            tfile.close()
+            
+            cap = cv2.VideoCapture(tfile.name)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)
+            
+            st.info("Processing video frames through YOLO11... Please wait.")
+            progress_bar = st.progress(0)
+            
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+            
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_count = 0
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                results = model.predict(source=frame, conf=conf_threshold, verbose=False)
+                annotated_frame = results[0].plot()
+                out.write(annotated_frame)
+                frame_count += 1
+                if total_frames > 0:
+                    progress_bar.progress(min(frame_count / total_frames, 1.0))
+                    
+            cap.release()
+            out.release()
+            st.success("Video processing complete!")
+            st.video(output_file.name)
+            
+        except Exception as e:
+            st.error(f"An error occurred during video processing: {e}")
