@@ -61,30 +61,33 @@ if uploaded_file is not None:
             st.info("Processing video frames through YOLO11... Please wait.")
             progress_bar = st.progress(0)
             
-            # Use VP80 codec and .webm format for browser playback compatibility
-            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
-            out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'VP80'), fps, (width, height))
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
             
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            frame_count = 0
+            # Safely initialize VideoWriter with standard mp4v codec
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_file.name, fourcc, fps, (width, height))
             
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                results = model.predict(source=frame, conf=conf_threshold, verbose=False)
-                annotated_frame = results[0].plot()
-                out.write(annotated_frame)
-                frame_count += 1
-                if total_frames > 0:
-                    progress_bar.progress(min(frame_count / total_frames, 1.0))
-                    
-            cap.release()
-            out.release()
-            st.success("Video processing complete!")
-            
-            # Play the browser-compatible webm video
-            st.video(output_file.name)
+            if not out.isOpened():
+                st.error("Error: Could not initialize video writer.")
+            else:
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                frame_count = 0
+                
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    results = model.predict(source=frame, conf=conf_threshold, verbose=False)
+                    annotated_frame = results[0].plot()
+                    out.write(annotated_frame)
+                    frame_count += 1
+                    if total_frames > 0:
+                        progress_bar.progress(min(frame_count / total_frames, 1.0))
+                        
+                cap.release()
+                out.release()
+                st.success("Video processing complete!")
+                st.video(output_file.name)
             
         except Exception as e:
             st.error(f"An error occurred during video processing: {e}")
