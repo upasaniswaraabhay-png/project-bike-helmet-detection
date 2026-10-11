@@ -29,7 +29,6 @@ except Exception as e:
     st.stop()
 
 st.subheader("📁 Media Upload Center")
-# Single universal uploader that accepts both images and videos to prevent caching restriction bugs
 uploaded_file = st.file_uploader("Upload an Image (.jpg, .png) or Video (.mp4, .mov)", type=["jpg", "jpeg", "png", "mp4", "mov", "avi", "mkv"])
 
 if uploaded_file is not None:
@@ -62,8 +61,9 @@ if uploaded_file is not None:
             st.info("Processing video frames through YOLO11... Please wait.")
             progress_bar = st.progress(0)
             
-            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+            # Use VP80 codec and .webm format for browser playback compatibility
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
+            out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'VP80'), fps, (width, height))
             
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             frame_count = 0
@@ -82,6 +82,8 @@ if uploaded_file is not None:
             cap.release()
             out.release()
             st.success("Video processing complete!")
+            
+            # Play the browser-compatible webm video
             st.video(output_file.name)
             
         except Exception as e:
