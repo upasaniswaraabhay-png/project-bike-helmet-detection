@@ -16,7 +16,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.title("⚙️ Control Panel")
-input_mode = st.sidebar.radio("Select Input Mode", ["Image Snapshot", "Video Clip"])
 conf_threshold = st.sidebar.slider("AI Confidence Threshold", 0.1, 1.0, 0.3, 0.05)
 
 @st.cache_resource
@@ -29,12 +28,16 @@ except Exception as e:
     st.error(f"Error loading model: {e}")
     st.stop()
 
-if input_mode == "Image Snapshot":
-    st.subheader("📷 Image Detection Mode")
-    # Explicitly matching image formats
-    uploaded_file = st.file_uploader("Upload an Image file", type=["jpg", "jpeg", "png"])
+st.subheader("📁 Media Upload Center")
+# Single universal uploader that accepts both images and videos to prevent caching restriction bugs
+uploaded_file = st.file_uploader("Upload an Image (.jpg, .png) or Video (.mp4, .mov)", type=["jpg", "jpeg", "png", "mp4", "mov", "avi", "mkv"])
+
+if uploaded_file is not None:
+    file_name = uploaded_file.name.lower()
     
-    if uploaded_file is not None:
+    # Handle Image Files
+    if file_name.endswith(('.jpg', '.jpeg', '.png')):
+        st.subheader("📷 Image Detection Mode")
         image = Image.open(uploaded_file)
         col1, col2 = st.columns(2)
         with col1:
@@ -42,16 +45,13 @@ if input_mode == "Image Snapshot":
         with col2:
             results = model.predict(source=image, conf=conf_threshold)
             st.image(results[0].plot(), caption="Detected Objects Overlay", channels="BGR", use_container_width=True)
-
-elif input_mode == "Video Clip":
-    st.subheader("🎥 Video Detection Mode")
-    # Explicitly matching video formats so it accepts mp4, mov, etc. without erroring
-    uploaded_video = st.file_uploader("Upload a Video file", type=["mp4", "mov", "avi", "mkv"])
-    
-    if uploaded_video is not None:
+            
+    # Handle Video Files
+    elif file_name.endswith(('.mp4', '.mov', '.avi', '.mkv')):
+        st.subheader("🎥 Video Detection Mode")
         try:
             tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            tfile.write(uploaded_video.read())
+            tfile.write(uploaded_file.read())
             tfile.close()
             
             cap = cv2.VideoCapture(tfile.name)
