@@ -7,19 +7,18 @@ import tempfile
 from datetime import datetime
 from ultralytics import YOLO
 
-st.set_page_config(page_title="Traffic Police AI | Surveillance", page_icon="🚨", layout="wide")
+st.set_page_config(page_title="Real-Life Object Detection System", page_icon="🔍", layout="wide")
 
 st.markdown("""
-<div style="background-color: #1a1c23; padding: 15px; border-radius: 10px; border-left: 6px solid #ff4b4b;">
-    <h2 style="color: #ffffff; margin:0;">🚨 POLICE TRAFFIC SURVEILLANCE & HELMET ENFORCEMENT</h2>
-    <p style="color: #888; margin:5px 0 0 0;">YOLO11 Real-Time Object Detection Engine</p>
+<div style="background-color: #1a1c23; padding: 15px; border-radius: 10px; border-left: 6px solid #4b7bec;">
+    <h2 style="color: #ffffff; margin:0;">🔍 REAL-LIFE OBJECT DETECTION SYSTEM</h2>
+    <p style="color: #888; margin:5px 0 0 0;">YOLO11 Real-Time Computer Vision Pipeline</p>
 </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.title("👮 Control Center")
-input_mode = st.sidebar.radio("Select Input Mode", ["Image Snapshot", "CCTV Video Clip"])
-conf_threshold = st.sidebar.slider("AI Confidence", 0.1, 1.0, 0.3, 0.05)
-fine_amount = st.sidebar.number_input("Fine Amount ($)", value=1000)
+st.sidebar.title("⚙️ Control Panel")
+input_mode = st.sidebar.radio("Select Input Mode", ["Image Snapshot", "Video Clip"])
+conf_threshold = st.sidebar.slider("AI Confidence Threshold", 0.1, 1.0, 0.3, 0.05)
 
 @st.cache_resource
 def load_model():
@@ -28,18 +27,18 @@ def load_model():
 model = load_model()
 
 if input_mode == "Image Snapshot":
-    uploaded_file = st.file_uploader("Upload Traffic Frame", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload Test Image", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         image = Image.open(uploaded_file)
         col1, col2 = st.columns(2)
         with col1:
-            st.image(image, caption="Original Feed", use_container_width=True)
+            st.image(image, caption="Original Input", use_container_width=True)
         with col2:
             results = model.predict(source=image, conf=conf_threshold)
-            st.image(results[0].plot(), caption="AI Detection Overlay", channels="BGR", use_container_width=True)
+            st.image(results[0].plot(), caption="Detected Objects Overlay", channels="BGR", use_container_width=True)
 
-elif input_mode == "CCTV Video Clip":
-    uploaded_video = st.file_uploader("Upload Short CCTV Video (MP4/MOV)", type=["mp4", "mov"])
+elif input_mode == "Video Clip":
+    uploaded_video = st.file_uploader("Upload Short Video Clip (MP4/MOV)", type=["mp4", "mov"])
     if uploaded_video:
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_video.read())
@@ -49,7 +48,7 @@ elif input_mode == "CCTV Video Clip":
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)
         
-        st.info("Processing video frames... Please wait a moment.")
+        st.info("Processing video frames through YOLO11... Please wait.")
         progress_bar = st.progress(0)
         
         output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
