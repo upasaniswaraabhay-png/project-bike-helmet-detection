@@ -1,55 +1,75 @@
 import streamlit as st
-from ultralytics import YOLO
 from PIL import Image
+import numpy as np
+import pandas as pd
+import cv2
 import tempfile
-import os
+from datetime import datetime
+from ultralytics import YOLO
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="Bike Helmet Detection AI", 
-    page_icon="🚴‍♂️", 
-    layout="centered"
-)
+st.set_page_config(page_title="Traffic Police AI | Surveillance", page_icon="🚨", layout="wide")
 
-st.title("🚴‍♂️ Real-Time Bike Helmet Detection System")
-st.write("Powered by **YOLO11n** | Upload an image to analyze safety compliance (*With Helmet* vs. *Without Helmet*).")
+st.markdown("""
+<div style="background-color: #1a1c23; padding: 15px; border-radius: 10px; border-left: 6px solid #ff4b4b;">
+    <h2 style="color: #ffffff; margin:0;">🚨 POLICE TRAFFIC SURVEILLANCE & HELMET ENFORCEMENT</h2>
+    <p style="color: #888; margin:5px 0 0 0;">YOLO11 Real-Time Object Detection Engine</p>
+</div>
+""", unsafe_allow_html=True)
 
-# --- Load Model Weights ---
+st.sidebar.title("👮 Control Center")
+input_mode = st.sidebar.radio("Select Input Mode", ["Image Snapshot", "CCTV Video Clip"])
+conf_threshold = st.sidebar.slider("AI Confidence", 0.1, 1.0, 0.3, 0.05)
+fine_amount = st.sidebar.number_input("Fine Amount ($)", value=1000)
+
 @st.cache_resource
-def load_yolo_model():
-    # Looks for best.pt inside weights folder or main directory
-    model_path = "weights/best.pt" if os.path.exists("weights/best.pt") else "best.pt"
-    return YOLO(model_path)
+def load_model():
+    return YOLO("best.pt")
 
-try:
-    model = load_yolo_model()
-    st.success("YOLO11 Model Loaded Successfully!")
-except Exception as e:
-    st.error(f"Error loading model weights: {e}")
+model = load_model()
 
-# --- Image Upload Section ---
-uploaded_file = st.file_uploader("Choose an image (JPG, PNG, JPEG)...", type=["jpg", "jpeg", "png"])
+if input_mode == "Image Snapshot":
+    uploaded_file = st.file_uploader("Upload Traffic Frame", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(image, caption="Original Feed", use_container_width=True)
+        with col2:
+            results = model.predict(source=image, conf=conf_threshold)
+            st.image(results[0].plot(), caption="AI Detection Overlay", channels="BGR", use_container_width=True)
 
-if uploaded_file is not None:
-    input_image = Image.open(uploaded_file)
-    st.image(input_image, caption="Uploaded Image", use_container_width=True)
-    
-    if st.button("Detect Helmets"):
-        with st.spinner("Analyzing with YOLO11..."):
-            # Save uploaded file to temp path for YOLO model prediction
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                input_image.save(tmp_file.name)
-                tmp_path = tmp_file.name
-
-            # Run prediction
-            results = model.predict(source=tmp_path, conf=0.25)
-            
-            # Save result image
-            res_image_path = results[0].save()
-            
-            # Display processed image
-            st.image(res_image_path, caption="Detection Result", use_container_width=True)
-            
-            # Cleanup temp file
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+elif input_mode == "CCTV Video Clip":
+    uploaded_video = st.file_uploader("Upload Short CCTV Video (MP4/MOV)", type=["mp4", "mov"])
+    if uploaded_video:
+        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile.write(uploaded_video.read())
+        
+        cap = cv2.VideoCapture(tfile.name)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = int(cap.get(cv2.CAP_PROP_FPS) or 30)
+        
+        st.info("Processing video frames... Please wait a moment.")
+        progress_bar = st.progress(0)
+        
+        output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        out = cv2.VideoWriter(output_file.name, cv2.VideoWriter_fourcc(*'avc1'), fps, (width, height))
+        
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_count = 0
+        
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            results = model.predict(source=frame, conf=conf_threshold, verbose=False)
+            annotated_frame = results[0].plot()
+            out.write(annotated_frame)
+            frame_count += 1
+            if total_frames > 0:
+                progress_bar.progress(min(frame_count / total_frames, 1.0))
+                
+        cap.release()
+        out.release()
+        st.success("Video processing complete!")
+        st.video(output_file.name)
