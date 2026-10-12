@@ -1,14 +1,8 @@
 streamlit
 ultralytics
-pillow
-numpy
-pandas
 opencv-python-headless
+numpy
+pillow
+pandas
 imageio
 imageio-ffmpeg
-streamlit
-ultralytics
-opencv-python-headless
-numpy
-pillow
-pandas
