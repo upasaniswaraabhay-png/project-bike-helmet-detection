@@ -16,7 +16,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.title("⚙️ Control Panel")
-input_mode = st.sidebar.radio("Select Demo Mode", ["Image Snapshot Analysis", "Video Demonstration"])
+input_mode = st.sidebar.radio("Select Demo Mode", ["Image Snapshot Analysis", "Video Surveillance Detection"])
 conf_threshold = st.sidebar.slider("AI Confidence Threshold", 0.1, 1.0, 0.3, 0.05)
 
 @st.cache_resource
@@ -44,11 +44,11 @@ if input_mode == "Image Snapshot Analysis":
                 st.image(results[0].plot(), caption="AI Detection Overlay", channels="BGR", use_container_width=True)
         st.success("Inference executed successfully!")
 
-elif input_mode == "Video Demonstration":
-    st.subheader("🎥 Video Surveillance Stream")
-    st.info("💡 **Tip for Evaluators:** For real-time heavy video processing, models are executed locally. Below is your live video processing module.")
+elif input_mode == "Video Surveillance Detection":
+    st.subheader("🎥 Video Object Detection Pipeline")
+    st.info("💡 Upload a short clip (.mp4) to run full YOLO11 frame-by-frame detection.")
     
-    uploaded_video = st.file_uploader("Upload Video Clip", type=["mp4", "mov", "avi"])
+    uploaded_video = st.file_uploader("Upload Video File", type=["mp4", "mov", "avi"])
     
     if uploaded_video is not None:
         try:
@@ -56,7 +56,49 @@ elif input_mode == "Video Demonstration":
             tfile.write(uploaded_video.read())
             tfile.close()
             
-            st.video(tfile.name)
-            st.success("Video loaded and streamed successfully!")
+            cap = cv2.VideoCapture(tfile.name)
+            fps = int(cap.get(cv2.CAP_PROP_FPS) or 20)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
+            # Downscale resolution to protect cloud memory limits
+            target_w = 640
+            target_h = int(height * (target_w / width)) if width > 0 else 480
+            
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.avi')
+            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+            out = cv2.VideoWriter(output_file.name, fourcc, fps, (target_w, target_h))
+            
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_count = 0
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            status_text.text("Processing video through YOLO11...")
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                # Resize frame for performance
+                frame_resized = cv2.resize(frame, (target_w, target_h))
+                
+                # Run YOLO11 prediction on the frame
+                results = model.predict(source=frame_resized, conf=conf_threshold, verbose=False)
+                annotated_frame = results[0].plot()
+                
+                out.write(annotated_frame)
+                frame_count += 1
+                
+                if total_frames > 0:
+                    progress_bar.progress(min(frame_count / total_frames, 1.0))
+                    
+            cap.release()
+            out.release()
+            status_text.text("Video processing complete!")
+            st.success("YOLO11 successfully annotated the video stream!")
+            st.video(output_file.name)
+            
         except Exception as e:
-            st.error(f"Could not load video: {e}")
+            st.error(f"Video processing error: {e}")
