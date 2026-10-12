@@ -4,3 +4,5 @@ pillow
 numpy
 pandas
 opencv-python-headless
+imageio
+imageio-ffmpeg
