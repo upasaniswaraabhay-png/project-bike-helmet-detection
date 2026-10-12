@@ -6,3 +6,9 @@ pandas
 opencv-python-headless
 imageio
 imageio-ffmpeg
+streamlit
+ultralytics
+opencv-python-headless
+numpy
+pillow
+pandas
