@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 import cv2
 import tempfile
+import imageio
 from ultralytics import YOLO
 
 st.set_page_config(page_title="Real-Life Object Detection System", page_icon="🔍", layout="wide")
@@ -24,7 +25,7 @@ def load_model():
 try:
     model = load_model()
 except Exception as e:
-    st.error(f"Error loading YOLO11 model ('best.pt'): {e}")
+    st.error(f"⚠️ Could not find or load 'best.pt'! Error: {e}")
     st.stop()
 
 st.subheader("📁 Universal Media Hub")
@@ -47,7 +48,7 @@ if uploaded_file is not None:
                 st.image(results[0].plot(), caption="AI Detection Overlay", channels="BGR", use_container_width=True)
         st.success("Image analysis completed successfully!")
         
-    # 2. VIDEO HANDLING (Native Browser Player with Controls)
+    # 2. VIDEO HANDLING (H.264 Web-Playable Player)
     elif file_name.endswith(('.mp4', '.mov', '.avi')):
         st.subheader("🎥 Video Surveillance & Detection Mode")
         
@@ -58,51 +59,44 @@ if uploaded_file is not None:
             
             cap = cv2.VideoCapture(tfile.name)
             fps = int(cap.get(cv2.CAP_PROP_FPS) or 20)
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            
-            # Safe downscaling for cloud memory constraints
-            target_w = 640
-            target_h = int(height * (target_w / width)) if width > 0 else 480
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
             progress_bar = st.progress(0)
             status_text = st.empty()
             status_text.text("Processing frames through YOLO11...")
             
+            # Use imageio with H.264 codec for universal browser playback
             output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            writer = imageio.get_writer(output_file.name, fps=fps, codec='libx264', quality=7, macro_block_size=None)
             
-            # Use standard mp4v container
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(output_file.name, fourcc, fps, (target_w, target_h))
-            
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             frame_count = 0
-            
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
                     break
                 
-                frame_resized = cv2.resize(frame, (target_w, target_h))
+                # Resize to protect cloud memory limits & speed up rendering
+                frame_resized = cv2.resize(frame, (640, 360))
+                
+                # YOLO11 Prediction
                 results = model.predict(source=frame_resized, conf=conf_threshold, verbose=False)
                 annotated_frame = results[0].plot()
                 
-                out.write(annotated_frame)
-                frame_count += 1
+                # Convert BGR (OpenCV) to RGB (ImageIO)
+                annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+                writer.append_data(annotated_rgb)
                 
+                frame_count += 1
                 if total_frames > 0:
                     progress_bar.progress(min(frame_count / total_frames, 1.0))
                     
             cap.release()
-            out.release()
+            writer.close()
             
-            status_text.success("Video processing complete!")
+            status_text.success("Video processing complete! Play your annotated video below:")
             
-            # Read the file bytes directly to force Streamlit's video component to render standard player controls
-            video_file = open(output_file.name, 'rb')
-            video_bytes = video_file.read()
-            
-            st.video(video_bytes, format="video/mp4")
+            # Render the playable video container
+            st.video(output_file.name)
             
         except Exception as e:
             st.error(f"An error occurred during video processing: {e}")
